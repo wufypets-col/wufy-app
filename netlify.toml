@@ -1,0 +1,14 @@
+[build]
+  # Este es el comando que "cocina" la app
+  command = "npm run build"
+  
+  # Esta es la carpeta que Netlify debe publicar
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
