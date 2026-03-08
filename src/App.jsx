@@ -1,8 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Dog, Activity, Scale, Utensils, ArrowRight, ArrowLeft, Settings, Check, HeartPulse, Sparkles, Calculator, PawPrint, Leaf, Package, User, Phone, Download, MapPin, Home, CloudLightning } from 'lucide-react';
+import { Dog, Activity, Scale, Utensils, ArrowRight, ArrowLeft, Settings, Check, HeartPulse, Sparkles, Calculator, PawPrint, Leaf, Package, User, Phone, Download, MapPin, Home, CloudLightning, Eye, EyeOff } from 'lucide-react';
 
 // --- Utilerías ---
 const roundPrice = (value) => Math.ceil(value / 100) * 100;
+
+// Estado inicial para limpiar el formulario fácilmente
+const initialUserData = {
+  ownerName: '', whatsapp: '', name: '', breed: '', weight: 10, age: 4, activity: 'medium', allergies: '', currentFood: '', address: '', building: '', tower: '', apartment: ''
+};
 
 const downloadCSV = (data) => {
   if (!data || data.length === 0) {
@@ -69,12 +74,13 @@ export default function App() {
   });
 
   const [leads, setLeads] = useState([]);
-  const [userData, setUserData] = useState({
-    ownerName: '', whatsapp: '', name: '', breed: '', weight: 10, age: 4, activity: 'medium', allergies: '', currentFood: '', address: '', building: '', tower: '', apartment: ''
-  });
+  const [userData, setUserData] = useState(initialUserData);
   const [step, setStep] = useState(0);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showCajita, setShowCajita] = useState(false);
+  
+  // NUEVO: Estado para activar/desactivar la visualización de la cotización
+  const [showQuoteMode, setShowQuoteMode] = useState(true);
 
   // --- MOTOR DE CÁLCULO ---
   const calculations = useMemo(() => {
@@ -104,7 +110,8 @@ export default function App() {
 
   // --- SINCRONIZACIÓN API ---
   const syncToMaster = async (lead) => {
-    const API_URL = "https://script.google.com/macros/s/AKfycbxxZcM0QeylWqm2FQXBRimuPJ-s-pWtpmD7YOCMddi_pJl3MDddXhQLYeIwG-fbC1c/exec"; // <--- PEGAR URL AQUÍ
+    // ESTA ES LA URL DE TU GOOGLE SHEET (ASEGÚRATE QUE SEA LA CORRECTA)
+    const API_URL = "https://script.google.com/macros/s/AKfycbxxZcM0QeylWqm2FQXBRimuPJ-s-pWtpmD7YOCMddi_pJl3MDddXhQLYeIwG-fbC1c/exec"; 
     try {
       const payload = {
         ownerName: lead.ownerName,
@@ -121,7 +128,7 @@ export default function App() {
         fullAddress: `${lead.address} ${lead.building} T:${lead.tower} A:${lead.apartment}`
       };
       await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-      console.log("Sincronizado con Master OPS");
+      console.log("Sincronizado con Google Sheets (Master OPS)");
     } catch (e) { console.error("Error API:", e); }
   };
 
@@ -134,8 +141,14 @@ export default function App() {
       date: new Date().toISOString()
     };
     setLeads(prev => [...prev, newLead]);
-    syncToMaster(newLead); // Envío automático a la nube
+    syncToMaster(newLead); 
     if (!silent) alert("¡Lead guardado y sincronizado!");
+  };
+
+  // Función para limpiar todo y volver al inicio
+  const handleResetApp = () => {
+    setUserData(initialUserData);
+    setStep(0);
   };
 
   // --- RENDERIZADO DE PASOS ---
@@ -192,7 +205,20 @@ export default function App() {
           <h2 className="text-center text-2xl font-bold">Casi listos...</h2>
           <input type="text" placeholder="Raza" value={userData.breed} onChange={(e) => setUserData({...userData, breed: e.target.value})} className="w-full p-3 border rounded-xl" />
           <textarea placeholder="Alergias o condiciones" value={userData.allergies} onChange={(e) => setUserData({...userData, allergies: e.target.value})} className="w-full p-3 border rounded-xl h-24" />
-          <div className="flex justify-between"><Button variant="ghost" onClick={() => setStep(3)}>Atrás</Button><Button onClick={() => { saveLead(true); setStep(5); }}>Calcular <Sparkles/></Button></div>
+          <div className="flex justify-between">
+            <Button variant="ghost" onClick={() => setStep(3)}>Atrás</Button>
+            <Button onClick={() => { 
+                saveLead(true); 
+                if (showQuoteMode) {
+                  setStep(5); 
+                } else {
+                  alert("¡Datos de " + userData.name + " guardados con éxito!");
+                  handleResetApp(); // Reinicia el formulario automáticamente si no hay cotización
+                }
+              }}>
+              {showQuoteMode ? "Calcular" : "Guardar Datos"} <Sparkles/>
+            </Button>
+          </div>
         </div>
       );
       case 5: return (
@@ -213,7 +239,7 @@ export default function App() {
               <PriceTag original={calculations.signature.plan14.reg} final={calculations.signature.plan14.disc} label={`OFERTA -${config.discountSignature}%`} />
             </Card>
           </div>
-          <div className="flex justify-center"><Button variant="outline" onClick={() => setStep(0)}>Nueva Consulta</Button></div>
+          <div className="flex justify-center"><Button variant="outline" onClick={handleResetApp}>Nueva Consulta</Button></div>
         </div>
       );
       default: return null;
@@ -238,9 +264,26 @@ export default function App() {
       {showAdmin && (
         <div className="fixed right-4 top-20 w-80 bg-white shadow-2xl rounded-xl p-4 border animate-slideIn z-40 max-h-[80vh] overflow-y-auto">
           <h3 className="font-bold mb-4 flex items-center gap-2 text-stone-700"><Settings size={16}/> IT Control Panel</h3>
+          
           <div className="space-y-4">
+            {/* BOTÓN TOGGLE DE COTIZACIÓN */}
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs font-bold text-amber-800 uppercase">Modo Cotización</span>
+                <button 
+                  onClick={() => setShowQuoteMode(!showQuoteMode)}
+                  className={`p-1 rounded-md transition-colors ${showQuoteMode ? 'bg-amber-600 text-white' : 'bg-stone-300 text-stone-600'}`}
+                >
+                  {showQuoteMode ? <Eye size={18}/> : <EyeOff size={18}/>}
+                </button>
+              </label>
+              <p className="text-[10px] text-amber-600 mt-1">{showQuoteMode ? "Los clientes verán precios." : "Solo se recolectarán datos."}</p>
+            </div>
+
             <Button variant="success" className="w-full text-xs" onClick={() => downloadCSV(leads)}><Download size={14}/> Bajar CSV Local</Button>
+            
             <div className="p-2 bg-stone-100 rounded text-[10px] font-mono">Leads en memoria: {leads.length}</div>
+            
             <div className="space-y-2 pt-2 border-t">
               <label className="text-[10px] font-bold uppercase text-stone-400">Configuración Financiera</label>
               {Object.keys(config).filter(k => typeof config[k] === 'number').map(key => (
