@@ -111,7 +111,7 @@ export default function App() {
   // --- SINCRONIZACIÓN API ---
   const syncToMaster = async (lead) => {
     // ESTA ES LA URL DE TU GOOGLE SHEET (ASEGÚRATE QUE SEA LA CORRECTA)
-    const API_URL = "https://script.google.com/macros/s/AKfycbxxZcM0QeylWqm2FQXBRimuPJ-s-pWtpmD7YOCMddi_pJl3MDddXhQLYeIwG-fbC1c/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbw3XcdCTahPVO7--cuuesP8zmw36kbSwz_YauKDes-BKq06_h4IRg5e0ECW4hHMohMo/exec"; 
     try {
       const payload = {
         ownerName: lead.ownerName,
