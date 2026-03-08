@@ -4,30 +4,10 @@ import { Dog, Activity, Scale, Utensils, ArrowRight, ArrowLeft, Settings, Check,
 // --- Utilerías ---
 const roundPrice = (value) => Math.ceil(value / 100) * 100;
 
-// Estado inicial para limpiar el formulario fácilmente
 const initialUserData = {
-  ownerName: '', whatsapp: '', name: '', breed: '', weight: 10, age: 4, activity: 'medium', allergies: '', currentFood: '', address: '', building: '', tower: '', apartment: ''
-};
-
-const downloadCSV = (data) => {
-  if (!data || data.length === 0) {
-    alert("No hay leads guardados para exportar.");
-    return;
-  }
-  const headers = ["Fecha", "Hora", "Dueño", "WhatsApp", "Perro", "Raza", "Peso", "Edad", "Actividad", "Alergias", "Comida Actual", "Dirección", "Plan Vital", "Plan Sig Full", "Plan Sig Desc"];
-  const rows = data.map(lead => [
-    new Date(lead.date).toLocaleDateString(),
-    new Date(lead.date).toLocaleTimeString(),
-    lead.ownerName, lead.whatsapp, lead.name, lead.breed, lead.weight, lead.age, lead.activity, lead.allergies, lead.currentFood, lead.address, lead.quoteVital, lead.quoteSignatureRegular, lead.quoteSignatureDiscount
-  ]);
-  const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "leads_wufy_completo.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  ownerName: '', whatsapp: '', name: '', breed: '', weight: 10, age: 4, 
+  activity: 'medium', allergies: '', currentFood: '', address: '', 
+  building: '', tower: '', apartment: ''
 };
 
 // --- Componentes UI ---
@@ -78,8 +58,6 @@ export default function App() {
   const [step, setStep] = useState(0);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showCajita, setShowCajita] = useState(false);
-  
-  // NUEVO: Estado para activar/desactivar la visualización de la cotización
   const [showQuoteMode, setShowQuoteMode] = useState(true);
 
   // --- MOTOR DE CÁLCULO ---
@@ -102,15 +80,16 @@ export default function App() {
       grams: G,
       vital: { plan14: roundPrice((14 * vitalCVe) + config.delivery14Days) },
       signature: {
-        plan7: { reg: roundPrice((7 * sigCVe) + config.delivery7Days), disc: roundPrice(((7 * sigCVe) + config.delivery7Days) * (1 - config.discountSignature / 100)) },
-        plan14: { reg: roundPrice((14 * sigCVe) + config.delivery14Days), disc: roundPrice(((14 * sigCVe) + config.delivery14Days) * (1 - config.discountSignature / 100)) }
+        plan14: { 
+          reg: roundPrice((14 * sigCVe) + config.delivery14Days), 
+          disc: roundPrice(((14 * sigCVe) + config.delivery14Days) * (1 - config.discountSignature / 100)) 
+        }
       }
     };
   }, [config, userData]);
 
-  // --- SINCRONIZACIÓN API ---
+  // --- SINCRONIZACIÓN CON GOOGLE SHEETS ---
   const syncToMaster = async (lead) => {
-    // ESTA ES LA URL DE TU GOOGLE SHEET (ASEGÚRATE QUE SEA LA CORRECTA)
     const API_URL = "https://script.google.com/macros/s/AKfycbw3XcdCTahPVO7--cuuesP8zmw36kbSwz_YauKDes-BKq06_h4IRg5e0ECW4hHMohMo/exec"; 
     try {
       const payload = {
@@ -128,8 +107,31 @@ export default function App() {
         fullAddress: `${lead.address} ${lead.building} T:${lead.tower} A:${lead.apartment}`
       };
       await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-      console.log("Sincronizado con Google Sheets (Master OPS)");
-    } catch (e) { console.error("Error API:", e); }
+      console.log("Sincronización exitosa");
+    } catch (e) { console.error("Error de sincronización:", e); }
+  };
+
+  // Función para guardar específicamente la dirección desde la cajita
+  const saveAddressToSheet = () => {
+    if (!userData.ownerName || !userData.whatsapp) {
+      alert("Por favor ingresa primero el nombre del dueño y WhatsApp en el inicio para poder registrar la dirección.");
+      return;
+    }
+    const leadUpdate = {
+      ...userData,
+      quoteVital: calculations.vital.plan14,
+      quoteSignatureRegular: calculations.signature.plan14.reg,
+      quoteSignatureDiscount: calculations.signature.plan14.disc,
+      date: new Date().toISOString()
+    };
+    syncToMaster(leadUpdate);
+    setShowCajita(false);
+    alert("¡Datos de residencia sincronizados con el Master OPS!");
+  };
+
+  const handleResetApp = () => {
+    setUserData(initialUserData);
+    setStep(0);
   };
 
   const saveLead = (silent = false) => {
@@ -141,14 +143,7 @@ export default function App() {
       date: new Date().toISOString()
     };
     setLeads(prev => [...prev, newLead]);
-    syncToMaster(newLead); 
-    if (!silent) alert("¡Lead guardado y sincronizado!");
-  };
-
-  // Función para limpiar todo y volver al inicio
-  const handleResetApp = () => {
-    setUserData(initialUserData);
-    setStep(0);
+    syncToMaster(newLead);
   };
 
   // --- RENDERIZADO DE PASOS ---
@@ -212,11 +207,11 @@ export default function App() {
                 if (showQuoteMode) {
                   setStep(5); 
                 } else {
-                  alert("¡Datos de " + userData.name + " guardados con éxito!");
-                  handleResetApp(); // Reinicia el formulario automáticamente si no hay cotización
+                  alert("¡Lead guardado con éxito en el Master OPS!");
+                  handleResetApp(); 
                 }
               }}>
-              {showQuoteMode ? "Calcular" : "Guardar Datos"} <Sparkles/>
+              {showQuoteMode ? "Calcular" : "Finalizar y Guardar"} <Sparkles/>
             </Button>
           </div>
         </div>
@@ -230,12 +225,10 @@ export default function App() {
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="border-t-4 border-green-600">
               <h3 className="font-bold text-green-800 mb-2 flex items-center gap-2"><HeartPulse size={18}/> Plan Vital</h3>
-              <p className="text-xs text-stone-500 mb-4">Balance natural para el día a día.</p>
               <PriceTag final={calculations.vital.plan14} hideDiscount />
             </Card>
             <Card className="border-t-4 border-indigo-600 bg-indigo-50/30">
               <h3 className="font-bold text-indigo-800 mb-2 flex items-center gap-2"><Sparkles size={18}/> Plan Signature</h3>
-              <p className="text-xs text-stone-500 mb-4">Proteína noble y longevidad extra.</p>
               <PriceTag original={calculations.signature.plan14.reg} final={calculations.signature.plan14.disc} label={`OFERTA -${config.discountSignature}%`} />
             </Card>
           </div>
@@ -257,46 +250,26 @@ export default function App() {
       </nav>
 
       <main className="max-w-4xl mx-auto p-4 pt-10">
-        {step > 0 && step < 5 && <div className="flex gap-1 justify-center mb-6">{[1,2,3,4].map(i => <div key={i} className={`h-1 w-10 rounded-full ${step >= i ? 'bg-amber-600' : 'bg-stone-300'}`}/>)}</div>}
         <Card className="min-h-[450px] flex flex-col justify-center">{renderStep()}</Card>
       </main>
 
       {showAdmin && (
-        <div className="fixed right-4 top-20 w-80 bg-white shadow-2xl rounded-xl p-4 border animate-slideIn z-40 max-h-[80vh] overflow-y-auto">
+        <div className="fixed right-4 top-20 w-80 bg-white shadow-2xl rounded-xl p-4 border animate-slideIn z-40">
           <h3 className="font-bold mb-4 flex items-center gap-2 text-stone-700"><Settings size={16}/> IT Control Panel</h3>
-          
           <div className="space-y-4">
-            {/* BOTÓN TOGGLE DE COTIZACIÓN */}
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
               <label className="flex items-center justify-between cursor-pointer">
                 <span className="text-xs font-bold text-amber-800 uppercase">Modo Cotización</span>
-                <button 
-                  onClick={() => setShowQuoteMode(!showQuoteMode)}
-                  className={`p-1 rounded-md transition-colors ${showQuoteMode ? 'bg-amber-600 text-white' : 'bg-stone-300 text-stone-600'}`}
-                >
+                <button onClick={() => setShowQuoteMode(!showQuoteMode)} className={`p-1 rounded-md transition-colors ${showQuoteMode ? 'bg-amber-600 text-white' : 'bg-stone-300 text-stone-600'}`}>
                   {showQuoteMode ? <Eye size={18}/> : <EyeOff size={18}/>}
                 </button>
               </label>
-              <p className="text-[10px] text-amber-600 mt-1">{showQuoteMode ? "Los clientes verán precios." : "Solo se recolectarán datos."}</p>
-            </div>
-
-            <Button variant="success" className="w-full text-xs" onClick={() => downloadCSV(leads)}><Download size={14}/> Bajar CSV Local</Button>
-            
-            <div className="p-2 bg-stone-100 rounded text-[10px] font-mono">Leads en memoria: {leads.length}</div>
-            
-            <div className="space-y-2 pt-2 border-t">
-              <label className="text-[10px] font-bold uppercase text-stone-400">Configuración Financiera</label>
-              {Object.keys(config).filter(k => typeof config[k] === 'number').map(key => (
-                <div key={key} className="flex justify-between items-center text-xs">
-                  <span className="text-stone-500">{key}</span>
-                  <input type="number" value={config[key]} onChange={(e) => setConfig({...config, [key]: parseFloat(e.target.value)})} className="w-16 border rounded text-right p-1" />
-                </div>
-              ))}
             </div>
           </div>
         </div>
       )}
 
+      {/* MODAL DE DIRECCIÓN (REVISADO) */}
       {showCajita && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <Card className="w-full max-w-md p-0 overflow-hidden">
@@ -307,7 +280,8 @@ export default function App() {
                 <input placeholder="Edificio" value={userData.building} onChange={(e) => setUserData({...userData, building: e.target.value})} className="w-full p-2 border rounded" />
                 <input placeholder="Apto" value={userData.apartment} onChange={(e) => setUserData({...userData, apartment: e.target.value})} className="w-full p-2 border rounded" />
               </div>
-              <Button onClick={() => setShowCajita(false)} className="w-full">Guardar Local</Button>
+              {/* BOTÓN ACTUALIZADO PARA SINCRONIZAR */}
+              <Button onClick={saveAddressToSheet} className="w-full">Guardar y Sincronizar</Button>
             </div>
           </Card>
         </div>
